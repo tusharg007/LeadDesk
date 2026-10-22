@@ -160,6 +160,7 @@ export class SupabaseRepository implements Repository {
     const { error } = await this.user(ctx).rpc('decide_qualification', {
       p_id: id,
       p_decision: decision.decision,
+      p_reason: decision.reason,
       p_title: decision.task_title ?? null,
       p_draft: decision.draft ?? null,
     });

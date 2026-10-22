@@ -27,6 +27,7 @@ export const recommendationSchema = z.object({
 });
 export const decisionInput = z.object({
   decision: z.enum(['approve', 'reject']),
+  reason: z.string().trim().min(10).max(1000),
   task_title: z.string().trim().min(5).max(160).optional(),
   draft: z.string().trim().min(10).max(3000).optional(),
 });
@@ -63,6 +64,17 @@ export type Run = {
   error: string | null;
   created_at: string;
   completed_at: string | null;
+  review_audit?: {
+    reviewer_id: string;
+    reviewer_name: string;
+    reviewed_at: string;
+    reason: string;
+    decision: 'approve' | 'reject';
+    lead_company: string;
+    lead_revision: number;
+    approved_task_title: string | null;
+    approved_draft: string | null;
+  } | null;
 };
 export type Activity = {
   id: string;

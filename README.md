@@ -23,6 +23,7 @@ The API runs at **http://127.0.0.1:3001**. `pnpm dev` starts both processes.
 - Lead creation, search, stage filter, details, stage changes, and activity notes.
 - Qualification result with source excerpts, missing information, editable follow-up title/message, approve and dismiss.
 - Task creation, completion/reopening, and copyable message drafts.
+- Approval audit trail with mandatory decision notes, reviewer identity, timestamps, original recommendations, approved wording, and scoped JSON export.
 - Review acceptance and run timing summaries, with simulated runs clearly labeled.
 - Persisted local demo data and a separate Supabase-backed implementation.
 - Supabase sign-in, workspace/owner isolation, SQL migrations, and checked transactional RPCs.
@@ -38,7 +39,7 @@ The original `IMPLEMENTATION_PLAN.md` is the longer roadmap. This README describ
 
 ## Connect Supabase
 
-1. Create/use a Supabase project. Apply `supabase/migrations/001_crm.sql` once in a fresh project's SQL editor (or through your migration workflow).
+1. Create/use a Supabase project. Apply `supabase/migrations/001_crm.sql`, then `002_review_audit.sql` in order in the SQL editor (or through your migration workflow). Existing installations need only migration 002.
 2. Create a confirmed user in Supabase Authentication. This starter has sign-in but no public registration flow.
 3. Copy `.env.example` to `.env`. Set:
 
@@ -89,6 +90,10 @@ After a build, Express serves the production frontend on port 3001. CI runs type
 API tests cover the full create/qualify/approve/complete journey, malformed input, tenant and owner isolation, callback token scope/expiry, invented evidence, dashboard formulas, and persistent demo storage. The browser journey is also checked manually through the local UI.
 
 ## Metrics and limits
+
+The compliance-oriented feature is decision traceability: each new approval or dismissal requires a note, records the authenticated reviewer and server timestamp, and preserves approved text separately from the original AI recommendation. Recording and task creation happen in the same transaction. Repeated approvals cannot replace the recorded decision. The Reviews screen exposes a read-only history and JSON export limited to leads visible to the signed-in user. Earlier decisions without audit data are explicitly labeled legacy records.
+
+This demonstrates human oversight and auditability; it is not regulatory certification or a tamper-proof archive. Database administrators/service credentials can modify stored data. Retention policies, independent reviewers, regulated financial advice, and jurisdiction-specific controls are outside this starter's scope. Exports contain message drafts and source excerpts and should be handled as CRM data.
 
 - Open pipeline excludes Won/Lost. Won value is deal amount, not recognized revenue.
 - Win rate is Won / (Won + Lost), all time; an empty denominator shows no value.

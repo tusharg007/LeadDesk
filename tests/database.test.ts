@@ -21,6 +21,12 @@ test('Postgres migration enforces RLS, protects RPCs, and commits approval exact
     await db.exec(
       await readFile(new URL('../supabase/migrations/001_crm.sql', import.meta.url), 'utf8'),
     );
+    await db.exec(
+      await readFile(
+        new URL('../supabase/migrations/002_review_audit.sql', import.meta.url),
+        'utf8',
+      ),
+    );
     await db.exec(`insert into auth.users values('${admin}'),('${sales}'),('${outsider}');
       insert into public.workspaces(id,name) values('${ws}','Test studio'),('${ws2}','Other studio');
       insert into public.memberships values('${admin}','${ws}','admin','Admin'),('${sales}','${ws}','sales','Sales'),('${outsider}','${ws2}','admin','Other');
@@ -72,8 +78,49 @@ test('Postgres migration enforces RLS, protects RPCs, and commits approval exact
     await db.exec('reset role; set role service_role');
     await db.query('select public.finish_qualification($1,$2)', [run, JSON.stringify(result)]);
     await asUser(admin);
-    await db.query('select public.decide_qualification($1,$2)', [run, 'approve']);
-    await db.query('select public.decide_qualification($1,$2)', [run, 'approve']);
+    await assert.rejects(
+      db.query('select public.apply_qualification_decision($1,$2)', [run, 'approve']),
+      /permission denied/,
+    );
+    await assert.rejects(
+      db.query('select public.decide_qualification($1,$2,$3)', [run, 'approve', 'short']),
+      /decision note/,
+    );
+    await assert.rejects(
+      db.query('select public.decide_qualification($1,$2,$3)', [run, null, 'Evidence reviewed.']),
+      /Invalid decision/,
+    );
+    await db.query('select public.decide_qualification($1,$2,$3)', [
+      run,
+      'approve',
+      'Evidence and project fit reviewed.',
+    ]);
+    const audit = (
+      await db.query<{ review_audit: { reviewer_id: string; reason: string } }>(
+        'select review_audit from public.agent_runs where id=$1',
+        [run],
+      )
+    ).rows[0].review_audit;
+    assert.equal(audit.reviewer_id, admin);
+    assert.equal(audit.reason, 'Evidence and project fit reviewed.');
+    await db.query('select public.decide_qualification($1,$2,$3)', [
+      run,
+      'approve',
+      'A different note on a repeated approval.',
+    ]);
+    assert.deepEqual(
+      (await db.query('select review_audit from public.agent_runs where id=$1', [run])).rows[0],
+      { review_audit: audit },
+    );
+    await assert.rejects(
+      db.query("update public.agent_runs set review_audit='{}' where id=$1", [run]),
+      /permission denied/,
+    );
+    await db.query('select public.decide_qualification($1,$2,$3)', [
+      run,
+      'approve',
+      'Evidence and project fit reviewed.',
+    ]);
     assert.equal((await db.query('select * from public.tasks')).rows.length, 1);
     assert.equal(
       (await db.query<{ stage: string }>('select stage from public.leads')).rows[0].stage,
@@ -82,7 +129,11 @@ test('Postgres migration enforces RLS, protects RPCs, and commits approval exact
     await asUser(outsider);
     assert.equal((await db.query('select * from public.tasks')).rows.length, 0);
     await assert.rejects(
-      db.query('select public.decide_qualification($1,$2)', [run, 'approve']),
+      db.query('select public.decide_qualification($1,$2,$3)', [
+        run,
+        'approve',
+        'Evidence and project fit reviewed.',
+      ]),
       /not found/,
     );
     await asUser(admin);
@@ -98,7 +149,11 @@ test('Postgres migration enforces RLS, protects RPCs, and commits approval exact
     await asUser(admin);
     await db.query('select public.add_lead_note($1,$2)', [lead, 'The scope changed today.']);
     await assert.rejects(
-      db.query('select public.decide_qualification($1,$2)', [next.rows[0].run.id, 'approve']),
+      db.query('select public.decide_qualification($1,$2,$3)', [
+        next.rows[0].run.id,
+        'approve',
+        'Evidence and project fit reviewed.',
+      ]),
       /changed/,
     );
     assert.equal((await db.query('select * from public.tasks')).rows.length, 1);

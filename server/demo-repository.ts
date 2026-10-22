@@ -214,6 +214,23 @@ export class DemoRepository implements Repository {
         return;
       if (run.status !== 'awaiting_review' || !run.recommendation)
         throw new AppError(409, 'This review has already been resolved.');
+      if (decision.reason.trim().length < 10 || decision.reason.length > 1000)
+        throw new AppError(400, 'Add a decision note between 10 and 1,000 characters.');
+      run.review_audit = {
+        reviewer_id: ctx.userId,
+        reviewer_name: ctx.name,
+        reviewed_at: new Date().toISOString(),
+        reason: decision.reason.trim(),
+        decision: decision.decision,
+        lead_company: lead.company,
+        lead_revision: run.lead_revision,
+        approved_task_title:
+          decision.decision === 'approve'
+            ? decision.task_title || run.recommendation.task_title
+            : null,
+        approved_draft:
+          decision.decision === 'approve' ? decision.draft || run.recommendation.draft : null,
+      };
       if (decision.decision === 'reject') {
         run.status = 'rejected';
         this.activity(data, lead, 'Qualification suggestion dismissed.');

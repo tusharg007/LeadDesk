@@ -637,6 +637,7 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
                     </div>
                   )}
                   <AgentStats data={data} />
+                  <ReviewAudit data={data} />
                   <RunHistory data={data} onLead={setSelectedId} />
                 </>
               )}
@@ -928,6 +929,118 @@ function LeadTable({ leads, onLead }: { leads: Lead[]; onLead: (id: string) => v
     </div>
   ) : (
     <Empty title="No leads here yet">Add an inquiry or try a different search.</Empty>
+  );
+}
+
+function ReviewAudit({ data }: { data: Bootstrap }) {
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState('');
+  const records = data.runs.filter((r) => ['approved', 'rejected'].includes(r.status));
+  async function download() {
+    setExporting(true);
+    setError('');
+    try {
+      const report = await api<unknown>('/reviews/export');
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }),
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'leaddesk-review-audit.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  }
+  return (
+    <section className="panel audit-panel">
+      <div className="panel-heading">
+        <div>
+          <h2>Approval audit trail</h2>
+          <p>Who decided, why, and what was approved.</p>
+        </div>
+        <button
+          className="button small-button"
+          disabled={exporting || !records.length}
+          onClick={download}
+        >
+          {exporting ? 'Exporting…' : 'Export JSON'}
+        </button>
+      </div>
+      <p className="audit-caption">
+        Human oversight records for your visible leads. Exports include message drafts and source
+        excerpts.
+      </p>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      {!records.length && (
+        <Empty title="Decisions leave a record">
+          Approve or dismiss a suggestion with a decision note to start the audit trail.
+        </Empty>
+      )}
+      {records.map((run) => (
+        <details className="audit-record" key={run.id}>
+          <summary>
+            <span>
+              <strong>
+                {run.review_audit?.lead_company ||
+                  data.leads.find((l) => l.id === run.lead_id)?.company}
+              </strong>
+              <small>
+                {run.review_audit
+                  ? `${run.review_audit.reviewer_name} · ${new Date(run.review_audit.reviewed_at).toLocaleString()}`
+                  : 'Legacy decision · reviewer details were not recorded'}
+              </small>
+            </span>
+            <span className={`run-status ${run.status}`}>{run.status}</span>
+          </summary>
+          {run.review_audit && (
+            <div className="audit-body">
+              <h3>Decision note</h3>
+              <p>{run.review_audit.reason}</p>
+              <h3>Recorded context</h3>
+              <p>
+                {run.mode === 'demo' ? 'Simulated qualification' : 'n8n qualification'} · Lead
+                revision {run.review_audit.lead_revision}
+              </p>
+              <p className="audit-id">
+                Reviewer ID: {run.review_audit.reviewer_id}
+                <br />
+                Run ID: {run.id}
+              </p>
+              <h3>Original recommendation</h3>
+              <p>{run.recommendation?.summary}</p>
+              <p>
+                <strong>{run.recommendation?.task_title}</strong>
+              </p>
+              <p>{run.recommendation?.draft}</p>
+              {run.review_audit.approved_draft && (
+                <>
+                  <h3>Approved follow-up</h3>
+                  <p>
+                    <strong>{run.review_audit.approved_task_title}</strong>
+                  </p>
+                  <p>{run.review_audit.approved_draft}</p>
+                </>
+              )}
+              <h3>Source evidence</h3>
+              {run.recommendation?.evidence.map((e, i) => (
+                <blockquote key={i}>
+                  <small>{e.source_id}</small>
+                  <p>{e.quote}</p>
+                </blockquote>
+              ))}
+            </div>
+          )}
+        </details>
+      ))}
+    </section>
   );
 }
 
@@ -1390,6 +1503,7 @@ function ReviewForm({
   const result = run.recommendation!;
   const [title, setTitle] = useState(result.task_title);
   const [draft, setDraft] = useState(result.draft);
+  const [reason, setReason] = useState('');
   return (
     <div className="review-detail">
       <span className={`fit-badge ${result.fit}`}>{result.fit.replaceAll('_', ' ')}</span>
@@ -1425,7 +1539,7 @@ function ReviewForm({
           e.preventDefault();
           void mutate(
             `/reviews/${run.id}/decision`,
-            { decision: 'approve', task_title: title, draft },
+            { decision: 'approve', task_title: title, draft, reason },
             'Approved. Your follow-up task is ready.',
           );
         }}
@@ -1451,6 +1565,21 @@ function ReviewForm({
             required
           />
         </label>
+        <label>
+          Decision note
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            minLength={10}
+            maxLength={1000}
+            required
+            rows={2}
+            placeholder="Why are you approving or dismissing this suggestion?"
+          />
+        </label>
+        <p className="field-hint">
+          Your name, decision time, note, and approved text are recorded in the audit trail.
+        </p>
         {stale && (
           <p className="form-error">
             This lead changed after qualification. Dismiss this suggestion, then run qualification
@@ -1461,9 +1590,13 @@ function ReviewForm({
           <button
             type="button"
             className="button"
-            disabled={busy}
+            disabled={busy || reason.trim().length < 10}
             onClick={() =>
-              mutate(`/reviews/${run.id}/decision`, { decision: 'reject' }, 'Suggestion dismissed.')
+              mutate(
+                `/reviews/${run.id}/decision`,
+                { decision: 'reject', reason },
+                'Suggestion dismissed.',
+              )
             }
           >
             Dismiss

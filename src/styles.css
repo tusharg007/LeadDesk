@@ -2164,6 +2164,59 @@ form textarea::placeholder {
     font-size: 25px;
   }
 }
+.audit-panel {
+  margin-bottom: 24px;
+}
+.audit-caption {
+  padding: 0 23px 18px;
+  font-size: 12px;
+  color: #64745d;
+  line-height: 1.7;
+}
+.audit-record {
+  border-top: 1px solid var(--line);
+}
+.audit-record summary {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 23px;
+  cursor: pointer;
+}
+.audit-record summary strong {
+  display: block;
+  font-size: 13px;
+}
+.audit-record summary small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #64745d;
+}
+.audit-body {
+  padding: 0 23px 20px;
+  color: #52664a;
+}
+.audit-body h3 {
+  font-size: 12px;
+  margin: 18px 0 8px;
+}
+.audit-body p {
+  font-size: 12px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.audit-body .audit-id,
+.audit-body small {
+  font-size: 10px;
+}
+.audit-body blockquote {
+  border-left: 2px solid #ccd9ba;
+  margin: 10px 0;
+  padding-left: 12px;
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *:before,

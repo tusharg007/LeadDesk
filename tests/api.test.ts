@@ -32,6 +32,7 @@ test('complete lead → qualification → approval → task flow, including repe
         .post(`/api/reviews/${run.body.id}/decision`)
         .send({
           decision: 'approve',
+          reason: 'Scope and supporting evidence reviewed.',
           task_title: 'Discuss our portfolio requirements',
           draft: 'Hello, can we discuss the scope of your portfolio website?',
         })
@@ -62,11 +63,11 @@ test('stale suggestions cannot be approved and can be dismissed', async () => {
     .expect(201);
   await request(app)
     .post(`/api/reviews/${run.body.id}/decision`)
-    .send({ decision: 'approve' })
+    .send({ decision: 'approve', reason: 'Scope and supporting evidence reviewed.' })
     .expect(409);
   await request(app)
     .post(`/api/reviews/${run.body.id}/decision`)
-    .send({ decision: 'reject' })
+    .send({ decision: 'reject', reason: 'The source information has changed.' })
     .expect(200);
 });
 
@@ -81,7 +82,13 @@ test('repository scopes lead, task, and review access to workspace and owner', a
   assert.equal((await repo.snapshot(sales)).leads.length, 0);
   const run = await repo.createRun(demoContext, state.leads[0].id, 'demo');
   await repo.finishRun(run.id, demoQualification(state.leads[0], state.knowledge));
-  await assert.rejects(repo.decide(sales, run.id, { decision: 'approve' }), /not found/);
+  await assert.rejects(
+    repo.decide(sales, run.id, {
+      decision: 'approve',
+      reason: 'Scope and supporting evidence reviewed.',
+    }),
+    /not found/,
+  );
 });
 
 test('callback credentials are run-scoped, expiring, and resistant to tampering', () => {
@@ -153,4 +160,40 @@ test('dashboard has correct denominators and excludes closed leads from pipeline
     dashboard({ leads: [], tasks: [], runs: [], knowledge: [], activities: [] }).winRate,
     null,
   );
+});
+
+test('review audit captures edited text, rejects missing notes, and preserves the first decision', async () => {
+  const repo = new DemoRepository();
+  const app = createApp({ repo, mode: 'demo' });
+  const lead = (await repo.snapshot(demoContext)).leads[0];
+  const run = (await request(app).post(`/api/leads/${lead.id}/qualify`).send({}).expect(202)).body
+    .id;
+  await request(app).post(`/api/reviews/${run}/decision`).send({ decision: 'approve' }).expect(400);
+  const decision = {
+    decision: 'approve',
+    reason: 'Verified the inquiry against the service catalogue.',
+    task_title: 'Review the confirmed website scope',
+    draft: 'Hello Maya, let us review the confirmed scope together.',
+  };
+  await request(app).post(`/api/reviews/${run}/decision`).send(decision).expect(200);
+  await request(app)
+    .post(`/api/reviews/${run}/decision`)
+    .send({ ...decision, reason: 'This retry should not replace the original note.' })
+    .expect(200);
+  const report = (await request(app).get('/api/reviews/export').expect(200)).body;
+  assert.equal(report.records.length, 1);
+  assert.equal(report.records[0].review.reviewer_id, demoContext.userId);
+  assert.equal(report.records[0].review.reason, decision.reason);
+  assert.equal(report.records[0].review.approved_draft, decision.draft);
+  assert.notEqual(report.records[0].original_recommendation.draft, decision.draft);
+  const otherApp = createApp({
+    repo,
+    mode: 'supabase',
+    authenticate: async () => ({ ...demoContext, workspaceId: 'other-workspace' }),
+  });
+  const other = await request(otherApp)
+    .get('/api/reviews/export')
+    .set('Authorization', 'Bearer test')
+    .expect(200);
+  assert.deepEqual(other.body.records, []);
 });

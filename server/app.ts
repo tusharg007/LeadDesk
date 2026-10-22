@@ -246,6 +246,25 @@ export function createApp(options: AppOptions) {
     await repo.decide(res.locals.ctx, req.params.id, decisionInput.parse(req.body));
     res.json({ ok: true });
   });
+  app.get('/api/reviews/export', async (_req, res) => {
+    const data = await repo.snapshot(res.locals.ctx);
+    res.setHeader('Content-Disposition', 'attachment; filename="leaddesk-review-audit.json"');
+    res.json({
+      schema_version: 1,
+      exported_at: new Date().toISOString(),
+      scope: 'Reviews visible to the signed-in user',
+      records: data.runs
+        .filter((r) => ['approved', 'rejected'].includes(r.status))
+        .map((r) => ({
+          run_id: r.id,
+          lead_id: r.lead_id,
+          status: r.status,
+          mode: r.mode,
+          original_recommendation: r.recommendation,
+          review: r.review_audit || null,
+        })),
+    });
+  });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found.' }));
   app.use(
     (error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
