@@ -90,12 +90,16 @@ export function createApp(options: AppOptions) {
     const lead = data.leads[0];
     if (!lead || lead.revision !== run.lead_revision)
       throw new AppError(409, 'Lead changed during qualification.');
-    if (req.params.tool === 'context')
+    if (req.params.tool === 'context') {
+      z.object({ context_request: z.literal('current_lead').optional() })
+        .strict()
+        .parse(req.body);
       return res.json({
         lead,
         recent_activity: data.activities.slice(0, 10),
         open_tasks: data.tasks.filter((t) => !t.completed_at),
       });
+    }
     if (req.params.tool === 'knowledge') {
       const { query } = z.object({ query: z.string().trim().min(1).max(200) }).parse(req.body);
       const terms = query

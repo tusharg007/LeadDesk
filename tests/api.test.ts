@@ -109,12 +109,22 @@ test('internal tools deny unsigned access and reject fabricated evidence', async
   const run = await repo.createRun(demoContext, lead.id, 'n8n');
   await request(app).post(`/api/internal/runs/${run.id}/tools/context`).send({}).expect(401);
   const auth = `Bearer ${signRun(run.id, secret)}`;
+  await request(app)
+    .post(`/api/internal/runs/${run.id}/tools/context`)
+    .set('Authorization', auth)
+    .send({ context_request: 'another_lead' })
+    .expect(400);
   const context = await request(app)
     .post(`/api/internal/runs/${run.id}/tools/context`)
     .set('Authorization', auth)
-    .send({})
+    .send({ context_request: 'current_lead' })
     .expect(200);
   assert.equal(context.body.lead.id, lead.id);
+  await request(app)
+    .post(`/api/internal/runs/${run.id}/tools/context`)
+    .set('Authorization', auth)
+    .send({ context_request: 'current_lead', lead_id: state.leads[1].id })
+    .expect(400);
   const result = demoQualification(lead, state.knowledge);
   result.evidence[0].quote = 'Invented source text that does not exist.';
   await request(app)

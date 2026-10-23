@@ -11,6 +11,10 @@ test('n8n workflow keeps credentials out of prompts and connects bounded tools',
   assert.equal(nodes.get('Qualification webhook').parameters.authentication, 'headerAuth');
   assert.equal(nodes.get('Qualification webhook').parameters.responseMode, 'onReceived');
   const agent = nodes.get('Qualification agent');
+  const model = nodes.get('Choose a chat model');
+  assert.equal(model.type, '@n8n/n8n-nodes-langchain.lmChatGoogleGemini');
+  assert.ok(!model.credentials, 'Credentials must be selected locally, never exported');
+  assert.equal(workflow.connections[model.name].ai_languageModel[0][0].node, agent.name);
   assert.equal(agent.parameters.options.maxIterations, 6);
   assert.ok(!agent.parameters.text.includes('run_token'));
   assert.ok(!agent.parameters.options.systemMessage.includes('run_token'));
@@ -21,6 +25,10 @@ test('n8n workflow keeps credentials out of prompts and connects bounded tools',
     assert.ok(node.parameters.url.includes('run_id'));
     assert.ok(node.parameters.headerParameters.parameters[0].value.includes('run_token'));
     assert.ok(!node.parameters.url.includes('$fromAI'));
+    assert.ok(
+      node.parameters.jsonBody.includes('$fromAI'),
+      'Gemini tools require nonempty input schemas',
+    );
   }
   assert.equal(
     workflow.connections['Parse recommendation'].main[0][0].node,

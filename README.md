@@ -60,7 +60,7 @@ For another account, create its `memberships` row through the SQL editor with th
 
 ## Connect n8n
 
-Follow [n8n/README.md](n8n/README.md). Import [the workflow](n8n/qualification.workflow.json), configure webhook authentication and a model credential, and set the n8n environment variables. The live agent button stays disabled until its configuration is supplied.
+Follow [n8n/README.md](n8n/README.md). The supplied Docker Compose setup runs persistent local n8n Community Edition with a Gemini workflow and an optional webhook-only tunnel to your deployed CRM. No n8n Cloud subscription is required. Configure webhook authentication, a Gemini API credential with free-tier quota, and the n8n environment variables. The live agent button stays disabled until its configuration is supplied. AI availability depends on the local instance/tunnel being online and provider quota; the manual CRM works independently.
 
 The tool-using agent reads scoped CRM context and searches curated service knowledge. The server validates its schema and exact source quotations before showing the proposal. A lead revision check prevents approving an outdated recommendation. Approval never sends a message or marks a lead as contacted.
 
@@ -108,4 +108,4 @@ This demonstrates human oversight and auditability; it is not regulatory certifi
 
 Build the client and run the Express server on a Node host with `APP_MODE=supabase`, `HOST=0.0.0.0`, and the required environment variables. Serve it behind HTTPS. Host n8n separately with persistent storage and a stable encryption key. Use a reachable HTTPS `API_PUBLIC_URL`. Never deploy the unauthenticated demo or commit `.env`/n8n credentials.
 
-Live Supabase provisioning, n8n import/execution, model evaluation, and public deployment require account configuration and have not been performed by this local build. The repo includes the integration code and setup steps; it does not claim measured AI quality or production scale.
+Account configuration is separate from the default local demo. Supabase connectivity and the app deployment can be checked before enabling AI. A live n8n/Gemini execution and model evaluation must still be verified with your own instance and credential; passing repository tests does not establish measured AI quality or production scale.

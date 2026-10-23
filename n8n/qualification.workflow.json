@@ -4,7 +4,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Setup\n1. Configure Header Auth on the webhook: X-LeadDesk-Secret.\n2. Configure Anthropic credentials and choose an available model.\n3. Publish this workflow and put its Production URL in N8N_WEBHOOK_URL.\n4. Set matching secret and a reachable API_PUBLIC_URL in LeadDesk.\nNo credentials are included. Tokens stay in expressions, outside the model prompt.\nSee n8n/README.md.",
+        "content": "## Local n8n + Gemini\n1. Start the Docker Compose stack (see n8n/README.md).\n2. Set webhook Header Auth: X-LeadDesk-Secret.\n3. Add a Google Gemini API credential and verify the selected model has free-tier quota in your AI Studio project.\n4. Publish, start the webhook-only tunnel, and set its URL in Render.\n5. Set matching secrets and your Render API_PUBLIC_URL.\nNo credentials included. Tokens stay outside the prompt.",
         "height": 300,
         "width": 380
       },
@@ -50,25 +50,21 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "id",
-          "value": "claude-haiku-4-5"
-        },
+        "modelName": "models/gemini-3.8-flash",
         "options": {
-          "maxTokensToSample": 2500,
+          "maxOutputTokens": 4096,
           "temperature": 0.2
         }
       },
       "id": "model",
       "name": "Choose a chat model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
       "position": [180, 260]
     },
     {
       "parameters": {
-        "toolDescription": "Read the current lead, its recent notes, and open tasks. No arguments. Use before qualification.",
+        "toolDescription": "Read the bound lead, recent notes, and open tasks. Set context_request to current_lead. This cannot select another lead. Use before qualification.",
         "method": "POST",
         "url": "={{ $('Qualification webhook').first().json.body.api_url + '/api/internal/runs/' + $('Qualification webhook').first().json.body.run_id + '/tools/context' }}",
         "sendHeaders": true,
@@ -82,7 +78,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={}",
+        "jsonBody": "={{ JSON.stringify({ context_request: $fromAI('context_request', 'Set to current_lead to retrieve the bound lead context', 'string') }) }}",
         "options": {
           "timeout": 15000
         }
