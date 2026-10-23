@@ -12,14 +12,11 @@ import {
   ChevronRight,
   Circle,
   Clock3,
-  Command,
   ExternalLink,
   FileText,
   LayoutDashboard,
-  Leaf,
   Loader2,
   LogOut,
-  MoreHorizontal,
   Plus,
   Search,
   Sparkles,
@@ -27,7 +24,6 @@ import {
   X,
   AlertCircle,
   Inbox,
-  PanelLeftClose,
   RefreshCw,
 } from 'lucide-react';
 import { api, setAuth, type Config } from './api';
@@ -52,10 +48,10 @@ const initials = (name: string) =>
     .join('');
 type Page = 'Overview' | 'Leads' | 'Reviews' | 'Tasks';
 const pageCopy: Record<Page, string> = {
-  Overview: 'A little clarity for every opportunity.',
-  Leads: 'Good relationships start with the next conversation.',
-  Reviews: 'Your agent does the groundwork. You make the call.',
-  Tasks: 'Small next steps. Meaningful progress.',
+  Overview: 'Your pipeline, pending reviews, and upcoming work.',
+  Leads: 'Manage contacts, inquiries, and sales stages.',
+  Reviews: 'Review AI recommendations and track your decisions.',
+  Tasks: 'Follow-ups created from approved recommendations.',
 };
 
 function Status({ stage }: { stage: string }) {
@@ -243,29 +239,26 @@ function Login({ client }: { client?: SupabaseClient }) {
       <div className="login-story">
         <div className="brand">
           <span className="brand-mark">
-            <Leaf />
+            <LayoutDashboard size={21} />
           </span>
-          LeadDesk<span className="brand-dot">.</span>
+          LeadDesk
         </div>
         <div>
-          <p className="eyebrow">LESS BUSYWORK. MORE MOMENTUM.</p>
+          <p className="eyebrow">SALES CRM</p>
           <h1>
-            Every lead,
-            <br />a next step.
-          </h1>
-          <p>
-            A thoughtful workspace for relationships,
+            Your sales
             <br />
-            opportunities, and a little help from AI.
-          </p>
+            workspace.
+          </h1>
+          <p>Manage leads, review AI recommendations, and track follow-ups in one place.</p>
         </div>
-        <small>Built for teams that care about the details.</small>
+        <small>LeadDesk · Human-reviewed AI</small>
       </div>
       <main className="login-form">
         <div>
-          <span className="eyebrow">YOUR WORKSPACE AWAITS</span>
-          <h2>Welcome back.</h2>
-          <p className="muted">Sign in to pick up where you left off.</p>
+          <span className="eyebrow">LEADDESK</span>
+          <h2>Sign in</h2>
+          <p className="muted">Use your workspace account to continue.</p>
           <form onSubmit={submit}>
             <label>
               Email address
@@ -373,9 +366,9 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
           }}
         >
           <span className="brand-mark">
-            <Leaf size={21} />
+            <LayoutDashboard size={21} />
           </span>
-          LeadDesk<span className="brand-dot">.</span>
+          LeadDesk
         </a>
         <div className="workspace-switch">
           <span className="studio-mark">
@@ -383,7 +376,7 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
           </span>
           <div>
             <strong>{data?.context.workspaceName || 'Your workspace'}</strong>
-            <small>Agency workspace</small>
+            <small>Sales workspace</small>
           </div>
         </div>
         <span className="nav-label">WORKSPACE</span>
@@ -399,6 +392,8 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
             <button
               key={name}
               className={`nav-item ${page === name ? 'active' : ''}`}
+              aria-label={name}
+              aria-current={page === name ? 'page' : undefined}
               onClick={() => navigate(name)}
             >
               <Icon size={18} />
@@ -413,20 +408,6 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="agent-note">
-            <span className="agent-symbol">
-              <Sparkles size={17} />
-            </span>
-            <strong>A thoughtful second look.</strong>
-            <p>
-              Turn an inquiry into a clear,
-              <br />
-              reviewable next step.
-            </p>
-            <button onClick={() => navigate('Leads')}>
-              Explore your leads <ArrowUpRight size={14} />
-            </button>
-          </div>
           <div className="profile">
             <span className="avatar">{initials(data?.context.name || 'You')}</span>
             <div>
@@ -444,7 +425,6 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
-            <PanelLeftClose size={17} />
             <span>Workspace</span>
             <ChevronRight size={13} />
             <strong>{page}</strong>
@@ -460,18 +440,8 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
         <main className="main-content">
           <div className="page-heading">
             <div>
-              <div className="eyebrow">
-                {page === 'Overview' ? 'YOUR PIPELINE, IN PERSPECTIVE' : 'MAKE THE NEXT STEP COUNT'}
-              </div>
-              <h1>
-                {page === 'Overview'
-                  ? 'A clearer view. A better next step.'
-                  : page === 'Reviews'
-                    ? 'A second look, before the next step.'
-                    : page === 'Tasks'
-                      ? 'Make room for what’s next.'
-                      : 'Relationships in the making.'}
-              </h1>
+              <div className="eyebrow">WORKSPACE</div>
+              <h1>{page}</h1>
               <p>{pageCopy[page]}</p>
             </div>
             <button className="button primary" onClick={() => setNewLead(true)}>
@@ -576,8 +546,7 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
                   </div>
                   <LeadTable leads={leads} onLead={setSelectedId} />
                   <div className="table-footer">
-                    {leads.length} {leads.length === 1 ? 'relationship' : 'relationships'} · Sorted
-                    by newest first<span>One conversation at a time.</span>
+                    {leads.length} {leads.length === 1 ? 'lead' : 'leads'} · Newest first
                   </div>
                 </section>
               )}
@@ -591,7 +560,7 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
                       <h3>
                         {pending.length
                           ? `${pending.length} suggestion${pending.length > 1 ? 's' : ''} ready for your review`
-                          : 'You’re all caught up'}
+                          : 'No pending reviews'}
                       </h3>
                       <p>
                         Check the evidence, edit the draft, and approve a follow-up. Nothing is sent
@@ -631,8 +600,8 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
                   </div>
                   {!pending.length && (
                     <div className="panel">
-                      <Empty title="A little space to breathe.">
-                        Run qualification from a lead to see its suggested next step here.
+                      <Empty title="No recommendations to review">
+                        Qualify a lead to receive an assessment and a suggested follow-up.
                       </Empty>
                     </div>
                   )}
@@ -649,19 +618,13 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
                     mutate(
                       `/tasks/${task.id}`,
                       { complete },
-                      complete ? 'Task completed. Nice work.' : 'Task reopened.',
+                      complete ? 'Task completed.' : 'Task reopened.',
                       'PATCH',
                     )
                   }
                   onLead={setSelectedId}
                 />
               )}
-              <footer className="page-footer">
-                <span>
-                  <Leaf size={13} />A little structure. A lot more possibility.
-                </span>
-                <span>LeadDesk / Your next step starts here</span>
-              </footer>
             </>
           )}
         </main>
@@ -678,7 +641,7 @@ function Workspace({ onLogout }: { onLogout?: () => void }) {
           error={error}
           onClose={() => !busy && setNewLead(false)}
           onSubmit={async (input) => {
-            if (await mutate('/leads', input, 'A new relationship, ready to grow.')) {
+            if (await mutate('/leads', input, 'Lead created.')) {
               setNewLead(false);
               navigate('Leads');
             }
@@ -731,13 +694,13 @@ function Overview({
           label="Open pipeline"
           value={compactMoney(d.openValue)}
           icon={<BarChart3 size={17} />}
-          foot={`${open.length} opportunities in motion`}
+          foot={`${open.length} open opportunities`}
         />
         <Metric
           label="Won deal value"
           value={compactMoney(d.wonValue)}
           icon={<ArrowUpRight size={18} />}
-          foot={`${data.leads.filter((l) => l.stage === 'Won').length} relationships turned into projects`}
+          foot={`${data.leads.filter((l) => l.stage === 'Won').length} won deals`}
         />
         <Metric
           label="Closed win rate"
@@ -757,8 +720,8 @@ function Overview({
         <section className="panel pipeline-panel">
           <div className="panel-heading">
             <div>
-              <h2>Room to grow</h2>
-              <p>Your opportunities, from hello to handoff.</p>
+              <h2>Pipeline by stage</h2>
+              <p>Current lead distribution</p>
             </div>
             <span className="subtle-pill">{data.leads.length} leads</span>
           </div>
@@ -794,10 +757,9 @@ function Overview({
         <section className="panel next-panel">
           <div className="panel-heading">
             <div>
-              <h2>Your next moves</h2>
-              <p>A short list. A clear direction.</p>
+              <h2>Upcoming work</h2>
+              <p>Pending reviews and open tasks</p>
             </div>
-            <span className="sun-symbol">✳</span>
           </div>
           <div className="next-list">
             {pending.length > 0 && (
@@ -806,7 +768,7 @@ function Overview({
                   <Sparkles size={18} />
                 </span>
                 <div>
-                  <strong>Give your agent’s work a look</strong>
+                  <strong>Review recommendations</strong>
                   <small>
                     {pending.length} suggestion{pending.length > 1 ? 's' : ''} awaiting your review
                   </small>
@@ -830,7 +792,7 @@ function Overview({
               </button>
             ))}
             {!tasks.length && !pending.length && (
-              <Empty title="All clear for now">Your next steps will appear here.</Empty>
+              <Empty title="No upcoming work">Open tasks and pending reviews appear here.</Empty>
             )}
           </div>
           <button className="next-footer" onClick={() => onPage('Tasks')}>
@@ -841,8 +803,8 @@ function Overview({
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <h2>Fresh conversations</h2>
-            <p>A few relationships worth keeping close.</p>
+            <h2>Recent leads</h2>
+            <p>Your five newest inquiries</p>
           </div>
           <button className="text-button" onClick={() => onPage('Leads')}>
             All leads <ArrowUpRight size={16} />
@@ -1149,7 +1111,6 @@ function Tasks({
             </button>
           ))}
         </div>
-        <span className="muted small-text">A task at a time.</span>
       </div>
       {tasks.length ? (
         tasks.map((task) => (
@@ -1202,7 +1163,7 @@ function Tasks({
           </div>
         ))
       ) : (
-        <Empty title={view === 'Open' ? 'Nothing on your list.' : 'Progress will live here.'}>
+        <Empty title={view === 'Open' ? 'No open tasks' : 'No completed tasks'}>
           {view === 'Open'
             ? 'Approve an agent suggestion to create a follow-up task.'
             : 'Completed follow-ups will appear here.'}
@@ -1224,10 +1185,8 @@ function NewLead({
   onSubmit: (input: unknown) => Promise<void>;
 }) {
   return (
-    <Modal title="Start a new conversation" onClose={onClose}>
-      <p className="modal-description">
-        Capture the essentials. You can work out the details together.
-      </p>
+    <Modal title="New lead" onClose={onClose}>
+      <p className="modal-description">Add a contact and their project inquiry to your pipeline.</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -1392,7 +1351,7 @@ export function LeadDrawer({
         </div>
       </div>
       <section className="drawer-section">
-        <h3>In their words</h3>
+        <h3>Project inquiry</h3>
         <p className="inquiry">{lead.inquiry}</p>
       </section>
       <section className="drawer-section agent-section">
@@ -1560,7 +1519,7 @@ function ReviewForm({
           />
         </label>
         <label>
-          Message draft <span className="optional">Make it your own</span>
+          Message draft <span className="optional">Editable</span>
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

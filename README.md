@@ -37,6 +37,8 @@ One qualification agent; no autonomous email, follow-up agent, billing, invitati
 
 The original `IMPLEMENTATION_PLAN.md` is the longer roadmap. This README describes the implemented scope. Approving a suggestion creates a task in one API/database transaction; an extra n8n execution workflow or outbox is unnecessary for that local business mutation.
 
+See [the portfolio release notes](docs/PORTFOLIO.md) for verified live behavior, resume wording, and the local n8n availability limits.
+
 ## Connect Supabase
 
 1. Create/use a Supabase project. Apply `supabase/migrations/001_crm.sql`, then `002_review_audit.sql` in order in the SQL editor (or through your migration workflow). Existing installations need only migration 002.
