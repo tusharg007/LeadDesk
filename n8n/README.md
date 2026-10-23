@@ -18,13 +18,15 @@ The setup script creates three independent secrets in ignored `n8n/.env`. It pre
 
 The stack pins n8n 2.44.6, uses SQLite in a named Docker volume for workflow/credential storage, and binds local ports only to loopback. `N8N_ENCRYPTION_KEY` encrypts n8n credentials; retain it with the volume. n8n storage stays separate from Supabase's CRM tables. A single production execution runs at a time to limit model concurrency.
 
+The instance sets a 180-second workflow timeout and a 60-second AI request timeout. The editor's file import may omit workflow-level settings, so these limits also live in Compose. Check workflow settings after importing; keep execution-data retention disabled for normal use.
+
 ## 2. Import and configure the workflow
 
 1. In the local editor's workflow menu, select **Import from File** and choose `n8n/qualification.workflow.json`.
 2. Open `n8n/.env` locally, for example with `notepad n8n\.env`.
 3. On **Qualification webhook**, add a **Header Auth** credential: name `X-LeadDesk-Secret`, value the file's `N8N_WEBHOOK_SECRET`. Keep authentication enabled.
 4. Create an API key in [Google AI Studio](https://aistudio.google.com/api-keys) using a project on the free tier. Add that key as the **Google Gemini (PaLM) API** credential on **Choose a chat model**. The model key belongs in n8n credentials, never in React or Git.
-5. The workflow selects `models/gemini-3.8-flash`. Check that your project has free-tier quota for it in AI Studio; select another available, tool-capable free-tier Gemini model if necessary. Availability and quota are account-dependent. Do not enable paid billing to follow this guide.
+5. The workflow selects `models/gemini-3.5-flash-lite`. Check that your project has free-tier quota for it in AI Studio; select another available, tool-capable free-tier Gemini model if necessary. Availability and quota are account-dependent. Do not enable paid billing to follow this guide. If you imported an earlier export, change the existing model node to this model and publish again; changing the repository JSON does not update a published instance.
 6. Publish/activate the workflow. Its production path is `/webhook/leaddesk-qualification`. The temporary `/webhook-test/` path is intentionally blocked by our gateway.
 
 The context tool includes a dynamic `context_request` argument because Gemini requires a nonempty tool schema. The server only accepts `current_lead` (or the original empty body) and always derives lead scope from the signed run. The model cannot select a tenant, lead ID, or arbitrary URL.
@@ -66,6 +68,8 @@ For fully local development instead, set the CRM `.env` to `N8N_WEBHOOK_URL=http
 5. Complete the task and refresh to confirm persistence.
 
 Keep the laptop awake during demonstrations. Open the Render app first so its API is awake before starting the model run. Quota/model errors appear as a failed qualification; wait for quota recovery or correct the selected model, then start a new run. Do not repeatedly retry quota errors.
+
+If n8n reports `Failed to find execution to stop` while the CRM already shows failure, refresh the Executions page. Its active entry can be stale even after the failure callback completed. Restarting n8n may recover the runtime, but may not correct stale execution metadata. Verify the execution's terminal event and back up the stopped database before any individual metadata repair; never relabel a failed qualification as successful. Leave the tunnel container running to preserve its current address. Workflow and credential storage remains in the named volume. After any n8n container recreation, reload gateway DNS with `docker compose --project-directory n8n exec -T webhook-gateway nginx -s reload`. After recovery, retry once from LeadDesk; an API connection failure is different from an invalid key or exhausted quota.
 
 ## Daily use and backups
 
