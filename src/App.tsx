@@ -1322,7 +1322,7 @@ function NewLead({
 }
 
 type Mutate = (path: string, body: unknown, message: string, method?: string) => Promise<boolean>;
-function LeadDrawer({
+export function LeadDrawer({
   lead,
   data,
   busy,
@@ -1343,7 +1343,12 @@ function LeadDrawer({
     runs.find((r) => r.status === 'awaiting_review' && r.lead_revision === lead.revision) ||
     runs.find((r) => r.status === 'awaiting_review');
   const running = runs.some((r) => r.status === 'running');
-  const failed = runs.find((r) => r.status === 'failed');
+  const latest = runs.reduce<Run | undefined>(
+    (newest, run) =>
+      !newest || Date.parse(run.created_at) > Date.parse(newest.created_at) ? run : newest,
+    undefined,
+  );
+  const failed = latest?.status === 'failed' ? latest : undefined;
   const currentPending = pending?.lead_revision === lead.revision;
   return (
     <Modal title="Lead details" onClose={onClose} wide>
