@@ -1,113 +1,179 @@
 # LeadDesk
 
-A small, complete CRM flow: **capture a lead → qualify it → review the suggestion → create a follow-up → track progress**.
+### Agent-assisted lead qualification with human approval and decision traceability
 
-React + TypeScript, Express, Supabase PostgreSQL/Auth, and an importable n8n qualification agent. The product currently has four areas: Overview, Leads, Reviews, and Tasks.
+[![Check LeadDesk](https://github.com/tusharg007/LeadDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/tusharg007/LeadDesk/actions/workflows/ci.yml)
 
-## Run locally
+LeadDesk is a full-stack CRM for a small service business. It turns project inquiries into evidence-backed qualification recommendations and reviewable follow-up tasks. A tool-using n8n/Gemini agent performs the initial assessment; the salesperson checks the sources, edits the draft, and decides what happens next.
 
-Requires Node 22.12+ and pnpm. From the project directory:
+**React · TypeScript · Express · Supabase PostgreSQL/Auth · n8n · Gemini · Docker**
+
+[Live application](https://leaddesk-kxgh.onrender.com/) · [Setup guide](docs/SETUP.md) · [Agent workflow](n8n/README.md) · [Verification notes](docs/PORTFOLIO.md)
+
+> **Demo access:** The hosted application requires a provisioned workspace account. Explore the complete local demo without credentials or API keys using the quick start below. Live AI qualification requires the local n8n instance and webhook tunnel to be online; the manual CRM works independently.
+
+![LeadDesk overview showing pipeline value, stage distribution, pending reviews, and upcoming tasks](docs/screenshots/overview.jpg)
+
+## The problem
+
+Sales inquiries arrive with incomplete requirements, uncertain budgets, and delivery expectations that need clarification. A useful CRM should help a salesperson decide the next step while keeping the original inquiry, service guidance, and final decision connected.
+
+LeadDesk implements one complete workflow:
+
+**Capture an inquiry → qualify against service knowledge → review evidence and draft → approve or dismiss → complete the follow-up.**
+
+## Product features
+
+| Area                 | Implemented behavior                                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Overview**         | Open pipeline value, won deal value, closed win rate, stage distribution, pending reviews, and overdue tasks with drill-through navigation.                        |
+| **Leads**            | Create contacts and inquiries, search and filter stages, update the pipeline, and record activity notes.                                                           |
+| **Qualification**    | A bounded agent reads scoped lead context, searches curated service knowledge, and proposes an assessment, missing details, cited excerpts, and a follow-up draft. |
+| **Reviews**          | Inspect evidence, edit the task title and message, and approve or dismiss with a mandatory decision note.                                                          |
+| **Tasks**            | Track approved follow-ups, copy message drafts, and complete or reopen tasks. Approval creates a task; it does not send a message.                                 |
+| **Decision audit**   | Record the authenticated reviewer, timestamp, reason, original recommendation, and approved wording, with scoped JSON export.                                      |
+| **Workspace access** | Supabase sign-in, workspace isolation, owner-scoped sales access, and workspace-wide admin visibility.                                                             |
+
+The responsive interface uses a consistent Cupcake-inspired palette across pages, forms, and dialogs.
+
+## Screenshots
+
+These screenshots show the implemented interface with **synthetic local demo data**. Simulated recommendations and metrics are labeled in the UI; they are not model performance results. Select an image to view it at full size.
+
+| Leads                                                                                                                | Reviews                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Searchable lead directory with stage filters](docs/screenshots/leads.jpg)](docs/screenshots/leads.jpg)            | [![Review queue with qualification metrics and approval history](docs/screenshots/reviews.jpg)](docs/screenshots/reviews.jpg)                           |
+| **Tasks**                                                                                                            | **Qualification evidence**                                                                                                                              |
+| [![Follow-up tasks with an expanded approved message draft](docs/screenshots/tasks.jpg)](docs/screenshots/tasks.jpg) | [![Qualification drawer showing inquiry and service-knowledge source excerpts](docs/screenshots/qualification.jpg)](docs/screenshots/qualification.jpg) |
+
+<details>
+<summary>More screens: sign-in, lead creation, human approval, and audit detail</summary>
+
+### Workspace sign-in
+
+![Workspace account sign-in](docs/screenshots/sign-in.jpg)
+
+### Lead creation
+
+![New-lead form populated with a synthetic project inquiry](docs/screenshots/new-lead.jpg)
+
+### Human review
+
+![Editable follow-up draft and required decision note before approval](docs/screenshots/human-review.jpg)
+
+### Approval audit trail
+
+![Expanded approval record with reviewer, decision note, original recommendation, and approved wording](docs/screenshots/approval-audit.jpg)
+
+</details>
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[React + TypeScript] --> API[Express API]
+    UI --> AUTH[Supabase Auth]
+    API --> DB[(Supabase PostgreSQL)]
+    API -->|Authenticated webhook| N8N[n8n qualification agent]
+    N8N <--> MODEL[Gemini]
+    N8N -->|Signed context and knowledge tools| API
+    N8N -->|Validated result callback| API
+    API -->|Recommendation| UI
+    UI -->|Human decision| API
+    API -->|Atomic task and audit write| DB
+```
+
+| Layer                | Technology and responsibility                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| Frontend             | React 19, TypeScript, Vite, CSS theme tokens, and Lucide icons.                                           |
+| API                  | Express 5, Zod validation, authenticated requests, domain rules, and agent callbacks.                     |
+| Persistence          | Supabase PostgreSQL, SQL migrations, row-level security, and transactional RPCs.                          |
+| Agent orchestration  | Importable n8n workflow with Gemini, context and knowledge tools, parsing, and success/failure callbacks. |
+| Local infrastructure | Docker Compose, persistent n8n storage, and a webhook-only gateway with an optional Cloudflare tunnel.    |
+| Quality and delivery | Node test runner, Supertest, PGlite database tests, GitHub Actions, and Render hosting.                   |
+
+PostgreSQL stores CRM state, with row-level access policies and SQL transactions enforcing workspace boundaries and approval consistency.
+
+## AI engineering and approval controls
+
+The AI component participates in the sales workflow through tools and validated state transitions:
+
+1. **Create a scoped run.** The API records the lead revision and issues short-lived HMAC tokens bound to that run.
+2. **Retrieve business context.** The agent reads the current lead and searches the seeded service catalogue through API tools. It cannot choose another workspace or arbitrary endpoint.
+3. **Generate a structured recommendation.** The agent returns an assessment, information gaps, cited excerpts, and a suggested follow-up.
+4. **Validate before review.** The server checks the output schema and exact source quotations. Invalid evidence does not become a reviewable recommendation.
+5. **Require a human decision.** A salesperson can edit the draft and must explain an approval or dismissal. A lead revision check rejects stale recommendations.
+6. **Persist the outcome atomically.** Approval records the decision and creates one task per run. Repeated approvals cannot duplicate the task or replace the recorded decision.
+
+Tokens remain outside the model prompt. The Supabase service-role key stays on the backend, and the Gemini key stays in n8n credentials. Failure callbacks and timeout handling expose failed runs without presenting them as successful recommendations.
+
+The compliance angle is **decision traceability and human oversight**: who decided, why, what evidence was available, and which wording was approved. This is not a claim of regulatory certification or an administrator-proof archive.
+
+## Quick start
+
+Requires **Node.js 22.12+** and **pnpm 11**.
 
 ```sh
+git clone https://github.com/tusharg007/LeadDesk.git
+cd LeadDesk
 pnpm install
 pnpm dev
 ```
 
-Open **http://127.0.0.1:5173**. No environment file is needed for the default local demo.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). The development launcher starts the React app and API together; the API listens on port `3001`.
 
-The API runs at **http://127.0.0.1:3001**. `pnpm dev` starts both processes.
+No environment file is required for a fresh local demo. It uses deterministic qualification fixtures and stores changes in `.data/demo.json`. **This mode does not call an LLM or write to Supabase.** It binds to loopback and is intended for local exploration.
 
-### What works now
+If `pnpm` is unavailable, install it with `npm install --global pnpm@11`, then open a new terminal. If you already have a `.env` configured for Supabase, set `APP_MODE=demo` to explore the local demo instead.
 
-- Responsive overview with pipeline distribution, open deal value, won value, closed win rate, overdue tasks, and drill-through.
-- Lead creation, search, stage filter, details, stage changes, and activity notes.
-- Qualification result with source excerpts, missing information, editable follow-up title/message, approve and dismiss.
-- Task creation, completion/reopening, and copyable message drafts.
-- Approval audit trail with mandatory decision notes, reviewer identity, timestamps, original recommendations, approved wording, and scoped JSON export.
-- Review acceptance and run timing summaries, with simulated runs clearly labeled.
-- Persisted local demo data and a separate Supabase-backed implementation.
-- Supabase sign-in, workspace/owner isolation, SQL migrations, and checked transactional RPCs.
-- A real n8n workflow definition with scoped context/retrieval tools and a validated result callback.
+For real authentication and persistence, follow the [Supabase and deployment setup](docs/SETUP.md). For real agent execution, follow the [self-hosted n8n + Gemini guide](n8n/README.md). No n8n Cloud subscription is required; Gemini usage depends on the configured project's model availability and free-tier quota.
 
-**Demo mode is not AI.** It uses deterministic fixture logic so the entire product can be explored without keys. Changes persist in `.data/demo.json`; they do not go to Supabase. Demo mode binds only to loopback and must not be publicly deployed.
-
-### Deliberately small first release
-
-One qualification agent; no autonomous email, follow-up agent, billing, invitations, vector database, Redis, or custom workflow builder. Leads are owned by their creator. Admins can see all workspace leads; salespeople see their own. Team assignment UI and public onboarding are future work. The knowledge catalogue is seeded, not editable through the UI yet.
-
-The original `IMPLEMENTATION_PLAN.md` is the longer roadmap. This README describes the implemented scope. Approving a suggestion creates a task in one API/database transaction; an extra n8n execution workflow or outbox is unnecessary for that local business mutation.
-
-See [the portfolio release notes](docs/PORTFOLIO.md) for verified live behavior, resume wording, and the local n8n availability limits.
-
-## Connect Supabase
-
-1. Create/use a Supabase project. Apply `supabase/migrations/001_crm.sql`, then `002_review_audit.sql` in order in the SQL editor (or through your migration workflow). Existing installations need only migration 002.
-2. Create a confirmed user in Supabase Authentication. This starter has sign-in but no public registration flow.
-3. Copy `.env.example` to `.env`. Set:
-
-```dotenv
-APP_MODE=supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_PUBLISHABLE_KEY=your-publishable-or-legacy-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
-SEED_USER_EMAIL=the-user-you-created@example.com
-```
-
-4. Run `pnpm seed:supabase`. This creates a workspace/membership and synthetic sample leads and service knowledge for that account. It will not overwrite an existing membership. It never creates a password or modifies an existing auth user. If a network error leaves a partial seed, inspect the created records rather than rerunning blindly.
-5. Restart the API and sign in with that account. Remove `SEED_USER_EMAIL` after seeding if desired.
-
-Only the publishable URL/key goes to the browser. User operations use verified access tokens and a request-scoped Supabase client. Database RLS protects reads; checked RPCs protect mutations and audit entries. The service-role key is used only on the backend for authenticated agent callbacks. Run-scoped HMAC tokens never authorize other leads or workspaces.
-
-For another account, create its `memberships` row through the SQL editor with the intended workspace and `admin` or `sales` role. Accounts without a membership are denied. Membership management is intentionally not exposed as an unauthenticated API.
-
-## Connect n8n
-
-Follow [n8n/README.md](n8n/README.md). The supplied Docker Compose setup runs persistent local n8n Community Edition with a Gemini workflow and an optional webhook-only tunnel to your deployed CRM. No n8n Cloud subscription is required. Configure webhook authentication, a Gemini API credential with free-tier quota, and the n8n environment variables. The live agent button stays disabled until its configuration is supplied. AI availability depends on the local instance/tunnel being online and provider quota; the manual CRM works independently.
-
-The tool-using agent reads scoped CRM context and searches curated service knowledge. The server validates its schema and exact source quotations before showing the proposal. A lead revision check prevents approving an outdated recommendation. Approval never sends a message or marks a lead as contacted.
-
-## Project layout
-
-```text
-src/                       React UI and styles
-shared/                    Contracts, validation, and stage constants
-server/                    Express API, domain logic, storage implementations
-supabase/migrations/       Tables, RLS, constraints, transactional RPCs
-n8n/                       Importable agent workflow and prompt
-scripts/                   Development launcher and explicit Supabase seed
-tests/                     HTTP, domain, PostgreSQL, and workflow-contract tests
-```
-
-## Checks
+## Validation
 
 ```sh
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm start
 ```
 
-After a build, Express serves the production frontend on port 3001. CI runs typechecking, tests, and build. Database tests use PGlite (local PostgreSQL) with Supabase-style auth roles; they validate the migration, row isolation, RPC privileges, stale-review rejection, and duplicate-safe approval. They do not replace testing an actual Supabase project.
+GitHub Actions runs all three checks on pushes and pull requests. The suite currently contains **13 tests** covering:
 
-API tests cover the full create/qualify/approve/complete journey, malformed input, tenant and owner isolation, callback token scope/expiry, invented evidence, dashboard formulas, and persistent demo storage. The browser journey is also checked manually through the local UI.
+- The create → qualify → approve → complete API journey and input validation.
+- Workspace/owner isolation, database RLS, and RPC privileges.
+- Callback token scope and expiry, source evidence validation, and workflow contracts.
+- Stale review rejection, duplicate-safe approval, and audit export scope.
+- Dashboard calculations, demo persistence, and the superseded-failure display regression.
 
-## Metrics and limits
+Database tests run against local PostgreSQL through PGlite with Supabase-style auth roles. They complement live integration checks rather than replacing them. A real Supabase/n8n/Gemini run, approval, linked task creation, and completion persistence have also been verified; see [release verification notes](docs/PORTFOLIO.md). There is no published multi-scenario model accuracy benchmark.
 
-The compliance-oriented feature is decision traceability: each new approval or dismissal requires a note, records the authenticated reviewer and server timestamp, and preserves approved text separately from the original AI recommendation. Recording and task creation happen in the same transaction. Repeated approvals cannot replace the recorded decision. The Reviews screen exposes a read-only history and JSON export limited to leads visible to the signed-in user. Earlier decisions without audit data are explicitly labeled legacy records.
+## Project structure
 
-This demonstrates human oversight and auditability; it is not regulatory certification or a tamper-proof archive. Database administrators/service credentials can modify stored data. Retention policies, independent reviewers, regulated financial advice, and jurisdiction-specific controls are outside this starter's scope. Exports contain message drafts and source excerpts and should be handled as CRM data.
+```text
+src/                       React pages, dialogs, and shared theme
+shared/                    Contracts, validation, and pipeline constants
+server/                    Express API, domain logic, and repositories
+supabase/migrations/       Schema, RLS, constraints, and transactional RPCs
+n8n/                       Agent workflow, prompt, and Docker setup
+scripts/                   Development, Supabase seed, and n8n setup
+tests/                     API, database, domain, and workflow checks
+docs/                      Setup, release notes, and screenshots
+```
 
-- Open pipeline excludes Won/Lost. Won value is deal amount, not recognized revenue.
-- Win rate is Won / (Won + Lost), all time; an empty denominator shows no value.
-- The chart shows current stage distribution, not historical conversion rates.
-- Review acceptance excludes pending/failed runs. Demo timing is labeled simulated.
-- Dates render in the user's locale. Follow-ups are due 24 hours after approval.
-- The starter loads a small workspace snapshot. Supabase refuses truncated totals at 1,000 records per table; add pagination/SQL aggregate endpoints before growing beyond that scale.
-- Local demo storage supports a single API process. Supabase transactions handle concurrent approvals.
-- Callback tokens expire in 15 minutes. Stuck runs become failed on the next workspace read after that timeout. No background recovery service is required in this version.
+## Scope and operational limits
 
-## Deploying the live version
+This release is a focused portfolio MVP with one qualification agent and four product areas. Public registration, team assignment UI, a knowledge editor, autonomous messaging, and a second follow-up agent are outside the shipped scope. The [implementation plan](IMPLEMENTATION_PLAN.md) includes future work.
 
-Build the client and run the Express server on a Node host with `APP_MODE=supabase`, `HOST=0.0.0.0`, and the required environment variables. Serve it behind HTTPS. Host n8n separately with persistent storage and a stable encryption key. Use a reachable HTTPS `API_PUBLIC_URL`. Never deploy the unauthenticated demo or commit `.env`/n8n credentials.
+- **Hosting:** The CRM is hosted on Render with Supabase storage. AI execution currently runs on local n8n through a temporary tunnel. Laptop sleep or tunnel shutdown makes new AI runs unavailable; a changed tunnel hostname requires a Render environment update. Free-host cold starts and provider quotas apply.
+- **Metrics:** Open pipeline excludes Won/Lost. Won value represents deal amount, not recognized revenue. Win rate is `Won / (Won + Lost)`; the stage chart is a current snapshot, not a historical conversion funnel. Review acceptance excludes pending/failed runs.
+- **Scale:** The current implementation loads a small workspace snapshot and rejects truncated Supabase results at 1,000 records per table. Pagination and SQL aggregates are needed before expanding beyond that scope. Local demo storage supports one API process.
+- **Recovery:** Run tokens expire after 15 minutes. Abandoned runs are marked failed on a subsequent workspace read. Follow-up tasks are due 24 hours after approval.
 
-Account configuration is separate from the default local demo. Supabase connectivity and the app deployment can be checked before enabling AI. A live n8n/Gemini execution and model evaluation must still be verified with your own instance and credential; passing repository tests does not establish measured AI quality or production scale.
+## Documentation
+
+- [Setup, environment variables, and deployment](docs/SETUP.md)
+- [Self-hosted n8n and Gemini configuration](n8n/README.md)
+- [Verified release behavior and portfolio notes](docs/PORTFOLIO.md)
+- [Agent prompt](n8n/qualification.prompt.md)
+- [Longer implementation roadmap](IMPLEMENTATION_PLAN.md)
+
+Built by [tusharg007](https://github.com/tusharg007).
